@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Raporlar</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script defer src="/app.js"></script>
+  </head>
+  <body class="reports-page">
+    <header class="hero">
+      <nav class="nav">
+        <div class="brand">Raporlar</div>
+        <div class="nav-links">
+          <a href="/?lang=tr">Ana Sayfa</a>
+        </div>
+      </nav>
+      <div class="hero-content">
+        <div class="hero-text">
+          <p class="eyebrow">Projeler</p>
+          <h1>Raporlar</h1>
+          <div class="reports-intro">
+            <p class="lead">
+              Bir projeye tıklayarak raporunu görüntüleyebilirsin. Rapora ayrı bir sayfada
+              bakmak için ilgili karttaki “Yeni Sekmede Aç” butonunu kullan.
+            </p>
+            <div class="reports-key">
+              Tema kategorileri: Beyaz (CV), Turuncu (Ürünler), Mavi (Sistemler),
+              Yeşil (Araştırma), Siyah (Diğer).
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+    <main>
+      <section class="section reports-layout">
+        <aside class="reports-list">
+          <h2>Raporlar</h2>
+          <div class="reports-titles">
+            <div class="reports-group">
+              <h3>Beyaz</h3>
+              <ul>
+                <li>
+                  <a href="/PDFs/TR/Beyaz/Resume.pdf" data-pdf="/PDFs/TR/Beyaz/Resume.pdf">Özgeçmiş</a>
+                  <a href="/PDFs/TR/Beyaz/Resume.pdf" target="_blank" rel="noopener">Yeni Sekmede Aç</a>
+                </li>
+              </ul>
+            </div>
+            <div class="reports-group">
+              <h3>Turuncu</h3>
+              <ul>
+                <li>
+                  <a href="/PDFs/TR/Turuncu/Janus.pdf" data-pdf="/PDFs/TR/Turuncu/Janus.pdf">Janus</a>
+                  <a href="/PDFs/TR/Turuncu/Janus.pdf" target="_blank" rel="noopener">Yeni Sekmede Aç</a>
+                </li>
+                <li>
+                  <a href="/PDFs/TR/Turuncu/Theia.pdf" data-pdf="/PDFs/TR/Turuncu/Theia.pdf">Theia</a>
+                  <a href="/PDFs/TR/Turuncu/Theia.pdf" target="_blank" rel="noopener">Yeni Sekmede Aç</a>
+                </li>
+              </ul>
+            </div>
+            <div class="reports-group">
+              <h3>Mavi</h3>
+              <ul>
+                <li>
+                  <a href="/PDFs/TR/Mavi/G%C3%B6ksu.pdf" data-pdf="/PDFs/TR/Mavi/G%C3%B6ksu.pdf">Göksu</a>
+                  <a href="/PDFs/TR/Mavi/G%C3%B6ksu.pdf" target="_blank" rel="noopener">Yeni Sekmede Aç</a>
+                </li>
+                <li>
+                  <a href="/PDFs/TR/Mavi/Trieme.pdf" data-pdf="/PDFs/TR/Mavi/Trieme.pdf">Trieme</a>
+                  <a href="/PDFs/TR/Mavi/Trieme.pdf" target="_blank" rel="noopener">Yeni Sekmede Aç</a>
+                </li>
+                <li>
+                  <a href="/PDFs/TR/Mavi/Interbank%20Payment%20System.pdf" data-pdf="/PDFs/TR/Mavi/Interbank%20Payment%20System.pdf">Interbank Payment System</a>
+                  <a href="/PDFs/TR/Mavi/Interbank%20Payment%20System.pdf" target="_blank" rel="noopener">Yeni Sekmede Aç</a>
+                </li>
+              </ul>
+            </div>
+            <div class="reports-group">
+              <h3>Yeşil</h3>
+              <ul>
+                <li class="reports-empty-row">Henüz rapor yok.</li>
+              </ul>
+            </div>
+            <div class="reports-group">
+              <h3>Siyah</h3>
+              <ul>
+                <li class="reports-empty-row">Henüz rapor yok.</li>
+              </ul>
+            </div>
+          </div>
+        </aside>
+        <div class="reports-viewer">
+          <h2>Önizleme</h2>
+          <div class="reports-empty">Önizlemek için bir rapor seç.</div>
+          <iframe class="reports-frame" title="Rapor önizleme"></iframe>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

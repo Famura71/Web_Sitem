@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Furkan Ahmet Karabulut</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script defer src="/app.js"></script>
+  </head>
+  <body>
+    <header class="hero">
+      <nav class="nav">
+        <div class="brand language-toggle">
+          <button type="button" class="lang-btn is-active" data-lang="tr">TR</button>
+          <span>|</span>
+          <button type="button" class="lang-btn" data-lang="en">EN</button>
+        </div>
+        <div class="nav-links">
+          <a href="#hakkimda" data-i18n="nav.about">Hakkımda</a>
+          <a href="#projeler" data-i18n="nav.projects">Projeler</a>
+          <a href="#tecrubelerim" data-i18n="nav.experience">Tecrübelerim</a>
+          <a href="#referanslar" data-i18n="nav.references">Referanslarım</a>
+          <a href="#iletisim" data-i18n="nav.contact">Iletişim</a>
+        </div>
+      </nav>
+      <div class="hero-content">
+        <div class="hero-text">
+          <p class="eyebrow" data-i18n="hero.eyebrow">Kişisel Portfolyom</p>
+          <h1 data-i18n="hero.title">Merhaba, ben Furkan Ahmet Karabulut.</h1>
+          <p class="lead">
+            <span data-i18n="hero.lead">Java, Spring Boot ve modern web teknolojileri ile projeler gelistiriyorum.</span>
+          </p>
+          <div class="hero-actions">
+            <a class="btn primary" href="#projeler" data-i18n="hero.ctaProjects">Projelere Bak</a>
+            <a class="btn ghost" href="#iletisim" data-i18n="hero.ctaContact">Bana Ulas</a>
+          </div>
+        </div>
+        <img class="hero-photo" src="/Photos/Ben.jpg" alt="Ben">
+      </div>
+    </header>
+
+    <main>
+      <section id="hakkimda" class="section">
+        <h2 data-i18n="about.title">Hakkimda</h2>
+        <p>
+          <span data-i18n="about.body">Buraya kisa bir biyografi yazabilirsin. Calisma alanlarin, ilgilendigin teknolojiler ve hedeflerin bu bolumde yer alabilir.</span>
+        </p>
+        <div class="chips">
+          <span>Java</span>
+          <span>C++</span>
+          <span>C#</span>
+          <span>Python</span>
+          <span>MAVLink</span>
+        </div>
+      </section>
+
+      <section id="projeler" class="section">
+        <h2 data-i18n="projects.title">Projeler</h2>
+        <div class="grid">
+          <article class="card">
+            <h3 data-i18n="projects.janus.title">Janus</h3>
+            <p data-i18n="projects.janus.body">Wi-fi üzerinden dosyaları byte byte bölerek göndermeye yarayan proje.</p>
+            <div class="card-footer" data-i18n="projects.janus.footer">C++, Winsock</div>
+          </article>
+          <article class="card">
+            <h3 data-i18n="projects.theia.title">Theia</h3>
+            <p data-i18n="projects.theia.body">Windows üzerinde monitör oluşturup bunu bir Android cihaza Wi-fi üzerinden paylaşmak için geliştirdim.</p>
+            <div class="card-footer" data-i18n="projects.theia.footer">C++, Winsock, Android Studio</div>
+          </article>
+          <article class="card">
+            <h3 data-i18n="projects.web.title">Web Sitem</h3>
+            <p data-i18n="projects.web.body">Şu an size kendimi anlatmamı sağlayan web sitesi.</p>
+            <div class="card-footer" data-i18n="projects.web.footer">HTML, CSS, JS</div>
+          </article>
+          <article class="card">
+            <h3 data-i18n="projects.trieme.title">Trieme</h3>
+            <p data-i18n="projects.trieme.body">2024 Teknofest yarışmasına katıldığım İnsansız Deniz Aracı projem.</p>
+            <div class="card-footer" data-i18n="projects.trieme.footer">Python, MAVLink</div>
+          </article>
+          <article class="card">
+            <h3 data-i18n="projects.goksu.title">Göksu</h3>
+            <p data-i18n="projects.goksu.body">2025 Teknofest yarışmasına katıldığım İnsansız Deniz Aracı projem.</p>
+            <div class="card-footer" data-i18n="projects.goksu.footer">Python, MAVLink, AI</div>
+          </article>
+          <article class="card">
+            <h3 data-i18n="projects.interbank.title">Interbank Payment Service</h3>
+            <p data-i18n="projects.interbank.body">Okulda dönem projem için geliştirdiğim bankalar arası ödeme ve hesap sistemi.</p>
+            <div class="card-footer" data-i18n="projects.interbank.footer">Java, Hibernate, MySQL, Kafka, SOAP API, HTML, CSS</div>
+          </article>
+          <article class="card">
+            <h3 data-i18n="projects.aelita.title">Aelita</h3>
+            <p data-i18n="projects.aelita.body">Göksu projesinde geliştirilen AI modelini kişisel kullanım için geliştiriyorum.</p>
+            <div class="card-footer" data-i18n="projects.aelita.footer">AI, Makine Öğrenmesi, Windows Araçları</div>
+          </article>
+          <article class="card">
+            <h3 data-i18n="projects.moba.title">MOBA Manager</h3>
+            <p data-i18n="projects.moba.body">Football Manager serisinden esinlenerek bir MOBA Manager oyunu geliştiriyorum.</p>
+            <div class="card-footer" data-i18n="projects.moba.footer">C++, SDL2, RmlUi, MySQL</div>
+          </article>
+        </div>
+        <button type="button" class="section-note reports-button" data-i18n="projects.reports">Raporlar</button>
+      </section>
+
+      <section id="tecrubelerim" class="section">
+        <h2 data-i18n="experience.title">Tecrübelerim</h2>
+        <div class="grid experience-grid">
+          <article class="card experience-card" data-title-key="experience.one.title" data-detail-key="experience.one.detail" data-detail-img="/Photos/Turk_Telekom.jpg">
+            <h3 data-i18n="experience.one.title">Türk Telekom - Staj</h3>
+            <p data-i18n="experience.one.body">Staj donemi, yaptigin isler ve ogrendiklerin.</p>
+            <div class="card-footer">2024 - 2024</div>
+          </article>
+          <article class="card experience-card" data-title-key="experience.two.title" data-detail-key="experience.two.detail" data-detail-img="/Photos/YD_Yazilim.jpg">
+            <h3 data-i18n="experience.two.title">Firma Adi - Calisma</h3>
+            <p data-i18n="experience.two.body">Gorevin, projeler ve kullandigin teknolojiler.</p>
+            <div class="card-footer">2025 - 2026</div>
+          </article>
+          <article class="card experience-card" data-title-key="experience.three.title" data-detail-key="experience.three.detail" data-detail-img="/Photos/Esportimes.jpg">
+            <h3 data-i18n="experience.three.title">Firma Adi - Calisma</h3>
+            <p data-i18n="experience.three.body">Gorevin, projeler ve kullandigin teknolojiler.</p>
+            <div class="card-footer">2026 - Devam</div>
+          </article>
+        </div>
+        <div class="experience-overlay" aria-hidden="true">
+          <div class="experience-detail-inner">
+            <img class="experience-photo" src="/Photos/Turk_Telekom.jpg" alt="Tecrube fotografi">
+            <div class="experience-detail-text">
+              <h4 data-i18n="experience.detailTitle">Detaylar</h4>
+              <h3 class="experience-overlay-title"></h3>
+              <p class="experience-overlay-body"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="referanslar" class="section">
+        <h2 data-i18n="references.title">Referanslar</h2>
+        <div class="references">
+          <article class="reference-row">
+            <img class="reference-photo" src="/Photos/Neslihan_Akkoc.jpg" alt="Neslihan Akkoc">
+            <div class="reference-text">
+              <h3 data-i18n="references.one.name">Referans Ad Soyad</h3>
+              <p data-i18n="references.one.role">Unvan / Sirket</p>
+              <p data-i18n="references.one.note">
+                Kisa referans metni. Birlikte calisma sureci ve guclu yonler.
+              </p>
+            </div>
+          </article>
+          <article class="reference-row is-reversed">
+            <img class="reference-photo" src="/Photos/Cagri_Yuzbasioglu.jpg" alt="Cagri Yuzbasioglu">
+            <div class="reference-text">
+              <h3 data-i18n="references.two.name">Referans Ad Soyad</h3>
+              <p data-i18n="references.two.role">Unvan / Sirket</p>
+              <p data-i18n="references.two.note">
+                Kisa referans metni. Birlikte calisma sureci ve guclu yonler.
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="iletisim" class="section">
+        <h2 data-i18n="contact.title">Iletisim</h2>
+        <div class="contact-layout">
+          <form class="contact-form" action="/api/contact" method="post" enctype="multipart/form-data" data-contact-form>
+            <label>
+              <span data-i18n="contact.nameLabel">Isim</span>
+              <input type="text" name="isim" placeholder="Isim" aria-label="Isim" data-i18n-placeholder="contact.namePlaceholder">
+            </label>
+            <label>
+              <span data-i18n="contact.messageLabel">Mesaj</span>
+              <textarea name="mesaj" placeholder="Mesaj" rows="6" aria-label="Mesaj" data-i18n-placeholder="contact.messagePlaceholder"></textarea>
+            </label>
+            <label>
+              <span data-i18n="contact.fileLabel">Dosya Sec</span>
+              <input type="file" name="dosya" aria-label="Dosya yukle" accept=".zip,.rar,.7z,.png,.jpg,.jpeg,.webp,.mp3,.mp4">
+            </label>
+            <div class="contact-actions">
+              <button type="submit" class="btn primary" data-i18n="contact.send">Gonder</button>
+              <span class="contact-status" aria-live="polite"></span>
+            </div>
+          </form>
+          <div class="contact-info">
+            <p>Mail: furkanahmet.karabulut@outlook.com</p>
+            <p>LinkedIn: linkedin.com/in/furkan-ahmet-karabulut-977412226</p>
+            <p>GitHub: github.com/Famura71</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span data-i18n="footer.copyright">© 2026 Ad Soyad. Tum haklari saklidir.</span>
+    </footer>
+  </body>
+</html>
