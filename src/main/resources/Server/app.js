@@ -54,16 +54,19 @@ const translations = {
     "projects.aelita.footer": "AI, Makine Öğrenmesi, Windows Araçları",
     "projects.moba.title": "MOBA Manager",
     "projects.moba.body": "Football Manager serisinden esinlenerek bir MOBA Manager oyunu geliştiriyorum. Hala geliştirme aşamasında.",
-    "projects.moba.footer": "C++, SDL2, RmlUi, MySQL",
+    "projects.moba.footer": "Java, JavaFX, OpenCL, SQLite",
     "experience.title": "Tecrubelerim",
     "experience.one.title": "Türk Telekom",
     "experience.one.body": "Stajyer - Analiz ve Çevik Çözümler",
+    "experience.one.date": "2025 Temmuz - 2026 Ocak",
     "experience.one.detail": "Türk Telekom’un “Start Stajım” programının bir parçası oldum. Proje analiz ve çevik çözümler ekibinde çalıştım. Kısa dönem stajımı yaptıktan sonra uzun dönem stajına kabul aldım ve devamlılığı benim isteğime bağlı olarak 2026 Ocak ayına kadar stajyer olarak çalışma hakkı elde ettim.",
     "experience.two.title": "YD Yazılım",
     "experience.two.body": "Stajyer - Fullstack Developer",
+    "experience.two.date": "2023 Temmuz - 2023 Eylül",
     "experience.two.detail": "YD Yazılım bünyesinde staj yaptım. Bir toplantı uygulaması ve bir üniversite için öğrenme yönetim sistemi üzerine çalıştım. Deneyimli yazılım mühendisleriyle birlikte çalıştım.",
     "experience.three.title": "Esportimes",
     "experience.three.body": "Yazar/Çevirmen - Yarı Zamanlı Çalışan",
+    "experience.three.date": "2022 Kasım - 2024 Şubat",
     "experience.three.detail": "Esportimes’ın yazar kadrosunda bulundum ve hem yazarlık hem çevirmenlik yaptım. Genellikle espor içerikleri ürettim ve yabancı kaynakları Türkçe'ye, iş arkadaşlarımın ürettikleri içerikleri İngilizce'ye çevirdim. Tamamen uzaktan çalıştım.",
     "experience.detailTitle": "Detaylar",
     "references.title": "Referanslar",
@@ -80,7 +83,7 @@ const translations = {
     "contact.messagePlaceholder": "Mesaj",
     "contact.fileLabel": "Dosya Sec",
     "contact.send": "Gönder",
-    "footer.copyright": "© 2026 Ad Soyad. Tum haklari saklidir."
+    "footer.copyright": "© 2026 Furkan Ahmet Karabulut. Bütün hakları saklıdır"
   },
   en: {
     "nav.about": "About",
@@ -120,16 +123,19 @@ const translations = {
     "projects.aelita.footer": "AI, Machine Learning, Windows Tools",
     "projects.moba.title": "MOBA Manager",
     "projects.moba.body": "A MOBA Manager game inspired by the Football Manager series. It is in the development stage.",
-    "projects.moba.footer": "C++, SDL2, RmlUi, MySQL",
+    "projects.moba.footer": "Java, JavaFX, OpenCL, SQLite",
     "experience.title": "Experience",
     "experience.one.title": "Turk Telekom",
     "experience.one.body": "Intern - Project Analyst",
+    "experience.one.date": "July 2025 - January 2026",
     "experience.one.detail": "I joined Turk Telekom’s “Start Stajim” program and worked in the Project Analysis and Agile Solutions team. After completing the short-term internship, I was accepted for a long-term internship and continued as an intern until January 2026 by my own choice.",
     "experience.two.title": "YD Yazilim",
     "experience.two.body": "Intern - Fullstack Developer",
+    "experience.two.date": "July 2023 - September 2023",
     "experience.two.detail": "I interned at YD Yazilim, working on a meeting application and a learning management system for a university. I collaborated with experienced software engineers.",
     "experience.three.title": "Esportimes",
     "experience.three.body": "Writer/Translator - Part-time",
+    "experience.three.date": "November 2022 - February 2024",
     "experience.three.detail": "I was part of Esportimes’ writing team and worked as both a writer and translator. I mainly produced esports content and translated foreign sources into Turkish, while translating my teammates’ content into English. I worked fully remotely.",
     "experience.detailTitle": "Details",
     "references.title": "References",
@@ -146,7 +152,7 @@ const translations = {
     "contact.messagePlaceholder": "Message",
     "contact.fileLabel": "Choose File",
     "contact.send": "Send",
-    "footer.copyright": "© 2026 Name Surname. All rights reserved."
+    "footer.copyright": "© 2026 Furkan Ahmet Karabulut. All rights reserved."
   }
 };
 
