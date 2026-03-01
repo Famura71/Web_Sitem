@@ -37,3 +37,8 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### App data ###
+/web_sitem.db
+/src/resources/application.properties
+/src/resources/database/

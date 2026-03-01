@@ -1,0 +1,32 @@
+Yetkiler: {
+    case 0: return "Public Puller";
+    case 1: return "Public Puller + Pusher";
+    case 2: return "Public Admin";
+    case 3: return "Private Puller";
+    case 4: return "Private Puller + Pusher";
+    case 5: return "Private Admin";
+    case 6: return "Public Admin + Private Puller";
+    case 7: return "Public Admin + Private Puller + Pusher";
+    case 8: return "Private Admin + Public Puller";
+    case 9: return "Private Admin + Public Puller + Pusher";
+    case 10: return "Public Puller + Private Puller";
+    case 11: return "Private Puller + Pusher + Public Puller";
+    case 12: return "Private Puller + Public Puller + Pusher";
+    case 13: return "Public Puller + Pusher + Private Puller + Pusher";
+    case 14: return "Genel Admin";
+    default: return "Bilinmeyen Yetki";
+    }
+Server kodları:{
+Yetki yoksa şu anda 6 dönüyor. Başarılı durumda 0 (ve bazı senaryolarda 0|json).
+Diğer kodlar:
+•
+1: imza/hmac hatası veya payload format hatası
+•
+2: rsa decrypt / json parse / genel format hatası
+•
+3: kullanıcı yok
+•
+4: şifre yanlış
+•
+5: istenen resource/versiyon yok
+    }
