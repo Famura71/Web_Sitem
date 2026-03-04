@@ -37,6 +37,8 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 
 @RestController
 public class Passage_Controller {
@@ -76,6 +78,7 @@ public class Passage_Controller {
         return ResponseEntity.badRequest().build();
     }
 
+    // NOTE: pull side is unchanged (still loads whole zip in RAM). We can chunk this too later.
     @PostMapping(value = "/api/private/transfer/zip", consumes = MediaType.TEXT_PLAIN_VALUE, produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     public ResponseEntity<byte[]> send_file_zip(@RequestBody String ignored) {
         PullState state = lastPull.get();
@@ -95,24 +98,85 @@ public class Passage_Controller {
         }
     }
 
+    /**
+     * Chunked binary push upload.
+     * Body format:
+     *   [4 bytes idx LE][4 bytes total LE][12 bytes iv][ciphertext...][16 bytes tag]
+     */
     @PostMapping(value = "/api/private/transfer/pushzip", consumes = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     public ResponseEntity<byte[]> receive_push_zip(@RequestBody byte[] payload) {
-        PushState state = lastPush.getAndSet(null);
+        PushState state = lastPush.get(); // DO NOT clear per chunk
         if (state == null) {
             return ResponseEntity.badRequest().build();
         }
         try {
-            byte[] zipBytes = decrypt_aes_gcm(payload, state.aesKey);
-            String version = currentVersionString();
-            String fileName = version + " _ " + state.uploader + ".zip";
-            String basePath = "Public".equalsIgnoreCase(state.scope) ? publicPath : privatePath;
-            Path target = Path.of(basePath, state.klasor, fileName);
-            Files.createDirectories(target.getParent());
-            Files.write(target, zipBytes);
-            ResourceVersion rv = new ResourceVersion(state.klasor, state.klasor, state.scope, version, state.uploader);
-            resourceVersionRepository.save(rv);
+            if (payload == null || payload.length < 8 + 12 + 16) {
+                return ResponseEntity.ok("2".getBytes(StandardCharsets.UTF_8));
+            }
+
+            int idx = readIntLE(payload, 0);
+            int total = readIntLE(payload, 4);
+            if (idx < 0 || total <= 0 || idx >= total) {
+                return ResponseEntity.ok("2".getBytes(StandardCharsets.UTF_8));
+            }
+
+            // lock total once
+            if (state.totalChunks == -1) {
+                state.totalChunks = total;
+            } else if (state.totalChunks != total) {
+                return ResponseEntity.ok("2".getBytes(StandardCharsets.UTF_8));
+            }
+
+            // enforce ordering (prevents file corruption)
+            if (idx != state.expectedIndex) {
+                // Optional: idempotency for "response lost" case:
+                // if (idx == state.expectedIndex - 1) return ResponseEntity.ok("0".getBytes(StandardCharsets.UTF_8));
+                return ResponseEntity.ok("2".getBytes(StandardCharsets.UTF_8));
+            }
+
+            int off = 8;
+
+            byte[] iv = new byte[12];
+            System.arraycopy(payload, off, iv, 0, 12);
+            off += 12;
+
+            byte[] tag = new byte[16];
+            System.arraycopy(payload, payload.length - 16, tag, 0, 16);
+
+            int ctLen = payload.length - off - 16;
+            if (ctLen < 0) return ResponseEntity.ok("2".getBytes(StandardCharsets.UTF_8));
+            byte[] ct = new byte[ctLen];
+            System.arraycopy(payload, off, ct, 0, ctLen);
+
+            // decrypt this chunk
+            byte[] plain = decrypt_aes_gcm_binary(iv, ct, tag, state.aesKey);
+
+            // append plaintext into temp zip
+            Files.createDirectories(state.tempDir);
+            Files.write(state.tempZip, plain, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+
+            state.expectedIndex++;
+
+            // finalize on last chunk
+            if (idx == total - 1) {
+                String version = currentVersionString();
+                String fileName = version + " _ " + state.uploader + ".zip";
+                String basePath = "Public".equalsIgnoreCase(state.scope) ? publicPath : privatePath;
+                Path target = Path.of(basePath, state.klasor, fileName);
+                Files.createDirectories(target.getParent());
+
+                Files.move(state.tempZip, target, StandardCopyOption.REPLACE_EXISTING);
+
+                ResourceVersion rv = new ResourceVersion(state.klasor, state.klasor, state.scope, version, state.uploader);
+                resourceVersionRepository.save(rv);
+
+                cleanupDirQuiet(state.tempDir);
+                lastPush.set(null);
+            }
+
             return ResponseEntity.ok("0".getBytes(StandardCharsets.UTF_8));
         } catch (Exception ex) {
+            log.warn("receive_push_zip chunk failed: {}", ex.toString());
             return ResponseEntity.ok("2".getBytes(StandardCharsets.UTF_8));
         }
     }
@@ -422,8 +486,16 @@ public class Passage_Controller {
             aesKey = aesKeyRaw.getBytes(StandardCharsets.UTF_8);
         }
 
-        lastPush.set(new PushState(scope, klasor, aesKey, req.name));
-        return "0";
+        // start a new push session (single uploader assumption)
+        try {
+            Path tempDir = Files.createTempDirectory("malzahar_push_");
+            Path tempZip = tempDir.resolve("upload.zip");
+            lastPush.set(new PushState(scope, klasor, aesKey, req.name, tempDir, tempZip));
+            return "0";
+        } catch (Exception ex) {
+            log.warn("handle_push: cannot create temp dir: {}", ex.toString());
+            return "2";
+        }
     }
 
     private String handle_manage(RequestPayload req) {
@@ -488,6 +560,7 @@ public class Passage_Controller {
         return encrypted + "|" + Base64.getEncoder().encodeToString(signature);
     }
 
+    // Base64 AES-GCM (still used by pull side in this file)
     private String encrypt_aes_gcm(byte[] data, byte[] key) throws Exception {
         byte[] iv = new byte[12];
         new SecureRandom().nextBytes(iv);
@@ -506,6 +579,7 @@ public class Passage_Controller {
                 Base64.getEncoder().encodeToString(tag);
     }
 
+    // Base64 AES-GCM decrypt (old) - no longer used by pushzip in chunk mode
     private byte[] decrypt_aes_gcm(byte[] payload, byte[] key) throws Exception {
         String raw = new String(payload, StandardCharsets.UTF_8);
         String[] parts = raw.split("\\|", 3);
@@ -523,6 +597,37 @@ public class Passage_Controller {
         GCMParameterSpec spec = new GCMParameterSpec(128, iv);
         cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec);
         return cipher.doFinal(combined);
+    }
+
+    // NEW: binary AES-GCM decrypt for chunk payloads
+    private byte[] decrypt_aes_gcm_binary(byte[] iv, byte[] ct, byte[] tag, byte[] key) throws Exception {
+        byte[] combined = new byte[ct.length + tag.length];
+        System.arraycopy(ct, 0, combined, 0, ct.length);
+        System.arraycopy(tag, 0, combined, ct.length, tag.length);
+
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        GCMParameterSpec spec = new GCMParameterSpec(128, iv);
+        cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec);
+        return cipher.doFinal(combined);
+    }
+
+    private static int readIntLE(byte[] b, int off) {
+        return (b[off] & 0xFF)
+                | ((b[off + 1] & 0xFF) << 8)
+                | ((b[off + 2] & 0xFF) << 16)
+                | ((b[off + 3] & 0xFF) << 24);
+    }
+
+    private static void cleanupDirQuiet(Path dir) {
+        if (dir == null) return;
+        try {
+            // delete children first
+            Files.walk(dir)
+                    .sorted((a, b) -> b.compareTo(a))
+                    .forEach(p -> {
+                        try { Files.deleteIfExists(p); } catch (Exception ignored) {}
+                    });
+        } catch (Exception ignored) {}
     }
 
     private String currentVersionString() {
@@ -602,7 +707,6 @@ public class Passage_Controller {
             privateKey = kf.generatePrivate(spec);
         } catch (Exception ex) {
             log.warn("RSA decrypt debug: generatePrivate failed: {}", ex.toString());
-            // Try PKCS#1 -> PKCS#8 wrap
             try {
                 byte[] pkcs8 = wrapPkcs1ToPkcs8(keyBytes);
                 privateKey = kf.generatePrivate(new PKCS8EncodedKeySpec(pkcs8));
@@ -612,18 +716,6 @@ public class Passage_Controller {
             }
         }
         log.warn("RSA private key class: {}", privateKey.getClass().getName());
-
-        try {
-            java.security.interfaces.RSAPrivateCrtKey rsa = (java.security.interfaces.RSAPrivateCrtKey) privateKey;
-            java.security.spec.RSAPublicKeySpec pubSpec = new java.security.spec.RSAPublicKeySpec(
-                    rsa.getModulus(), rsa.getPublicExponent());
-            PublicKey pub = kf.generatePublic(pubSpec);
-            String pubB64 = Base64.getEncoder().encodeToString(pub.getEncoded());
-            log.warn("RSA public key len={}, modulusBits={}", pubB64.length(), rsa.getModulus().bitLength());
-            log.warn("RSA public key (SPKI, base64): {}", pubB64);
-        } catch (Exception ex) {
-            log.warn("RSA public key derive failed: {}", ex.toString());
-        }
 
         Cipher cipher;
         try {
@@ -663,11 +755,6 @@ public class Passage_Controller {
     }
 
     private byte[] wrapPkcs1ToPkcs8(byte[] pkcs1) {
-        // PrivateKeyInfo ::= SEQUENCE {
-        //   version INTEGER 0,
-        //   algorithm AlgorithmIdentifier (rsaEncryption OID + NULL),
-        //   privateKey OCTET STRING (PKCS#1 bytes)
-        // }
         byte[] algId = new byte[] {
                 0x30, 0x0D,
                 0x06, 0x09, 0x2A, (byte)0x86, 0x48, (byte)0x86, (byte)0xF7, 0x0D, 0x01, 0x01, 0x01,
@@ -801,11 +888,19 @@ public class Passage_Controller {
         private final byte[] aesKey;
         private final String uploader;
 
-        private PushState(String scope, String klasor, byte[] aesKey, String uploader) {
+        // new fields for chunked push
+        private final Path tempDir;
+        private final Path tempZip;
+        private volatile int totalChunks = -1;
+        private volatile int expectedIndex = 0;
+
+        private PushState(String scope, String klasor, byte[] aesKey, String uploader, Path tempDir, Path tempZip) {
             this.scope = scope;
             this.klasor = klasor;
             this.aesKey = aesKey;
             this.uploader = uploader;
+            this.tempDir = tempDir;
+            this.tempZip = tempZip;
         }
     }
 }
