@@ -39,6 +39,9 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.Map;
+import java.io.RandomAccessFile;
+import java.io.ByteArrayOutputStream;
 
 @RestController
 public class Passage_Controller {
@@ -48,6 +51,10 @@ public class Passage_Controller {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final AtomicReference<PullState> lastPull = new AtomicReference<>(null);
     private final AtomicReference<PushState> lastPush = new AtomicReference<>(null);
+
+    // Pull chunk size (plaintext read size). Push ile aynı mantık.
+    // Not: push tarafında C++ 80MB kullanmıştın, burada da aynısını kullandım.
+    private static final int PULL_CHUNK_SIZE = 80 * 1024 * 1024;
 
     @Value("${private.api.rsa-private-key-base64:}")
     private String rsaPrivateKeyBase64;
@@ -78,7 +85,7 @@ public class Passage_Controller {
         return ResponseEntity.badRequest().build();
     }
 
-    // NOTE: pull side is unchanged (still loads whole zip in RAM). We can chunk this too later.
+    // OLD endpoint kept for backward compatibility (RAM loads whole zip).
     @PostMapping(value = "/api/private/transfer/zip", consumes = MediaType.TEXT_PLAIN_VALUE, produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     public ResponseEntity<byte[]> send_file_zip(@RequestBody String ignored) {
         PullState state = lastPull.get();
@@ -95,6 +102,69 @@ public class Passage_Controller {
             return ResponseEntity.ok(encrypted.getBytes(StandardCharsets.UTF_8));
         } catch (Exception ex) {
             return ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * NEW: Chunked binary pull download.
+     *
+     * Request body:
+     *   [4 bytes idx LE][4 bytes total LE]   (client sends total it expects; server validates)
+     *
+     * Response body:
+     *   [4 bytes idx LE][4 bytes total LE][12 bytes iv][ciphertext...][16 bytes tag]
+     */
+    @PostMapping(value = "/api/private/transfer/zipchunk",
+            consumes = MediaType.APPLICATION_OCTET_STREAM_VALUE,
+            produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    public ResponseEntity<byte[]> send_file_zip_chunk(@RequestBody byte[] payload) {
+        PullState state = lastPull.get();
+        if (state == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            if (payload == null || payload.length < 8) {
+                return ResponseEntity.ok("2".getBytes(StandardCharsets.UTF_8));
+            }
+
+            int idx = readIntLE(payload, 0);
+            int totalFromClient = readIntLE(payload, 4);
+
+            if (idx < 0 || idx >= state.totalChunks) {
+                return ResponseEntity.ok("2".getBytes(StandardCharsets.UTF_8));
+            }
+            if (totalFromClient <= 0 || totalFromClient != state.totalChunks) {
+                return ResponseEntity.ok("2".getBytes(StandardCharsets.UTF_8));
+            }
+
+            Path file = Path.of(state.filePath);
+            if (!Files.exists(file) || !Files.isRegularFile(file)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            long offset = (long) idx * (long) state.chunkSize;
+            int toRead = state.chunkSize;
+            long remaining = state.fileSize - offset;
+            if (remaining <= 0) {
+                return ResponseEntity.ok("2".getBytes(StandardCharsets.UTF_8));
+            }
+            if (remaining < toRead) {
+                toRead = (int) remaining;
+            }
+
+            byte[] plain = readFileRange(file, offset, toRead);
+            byte[] enc = encrypt_aes_gcm_binary(plain, state.aesKey); // [iv(12)][ct...][tag(16)]
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream(8 + enc.length);
+            writeIntLE(out, idx);
+            writeIntLE(out, state.totalChunks);
+            out.write(enc);
+
+            return ResponseEntity.ok(out.toByteArray());
+        } catch (Exception ex) {
+            log.warn("send_file_zip_chunk failed: {}", ex.toString());
+            return ResponseEntity.ok("2".getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -129,7 +199,7 @@ public class Passage_Controller {
 
             // enforce ordering (prevents file corruption)
             if (idx != state.expectedIndex) {
-                // Optional: idempotency for "response lost" case:
+                // optional idempotency:
                 // if (idx == state.expectedIndex - 1) return ResponseEntity.ok("0".getBytes(StandardCharsets.UTF_8));
                 return ResponseEntity.ok("2".getBytes(StandardCharsets.UTF_8));
             }
@@ -367,6 +437,17 @@ public class Passage_Controller {
         }
     }
 
+    /**
+     * UPDATED: Pull control now returns AES key + chunk metadata (still RSA+HMAC signed).
+     * JSON:
+     * {
+     *   "response":"0",
+     *   "aes_key":"<b64>",
+     *   "chunk_size": 83886080,
+     *   "total_chunks": 123,
+     *   "file_size": 999999
+     * }
+     */
     private String handle_pull(RequestPayload req) {
         if (req.data == null || req.data.isBlank()) {
             return "2";
@@ -430,13 +511,35 @@ public class Passage_Controller {
 
         String fileName = chosen.getVersiyon() + " _ " + chosen.getYukleyen() + ".zip";
         String basePath = "Public".equalsIgnoreCase(scope) ? publicPath : privatePath;
-        String filePath = Path.of(basePath, resource, fileName).toString();
+        Path filePath = Path.of(basePath, resource, fileName);
+
+        if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
+            return "5";
+        }
 
         byte[] aesKey = generate_aes_key();
-        lastPull.set(new PullState(filePath, aesKey));
 
-        String json = "{\"response\":\"0 aes key : " + Base64.getEncoder().encodeToString(aesKey) + "\"}";
+        long fileSize;
         try {
+            fileSize = Files.size(filePath);
+        } catch (Exception ex) {
+            return "2";
+        }
+
+        int chunkSize = PULL_CHUNK_SIZE;
+        int totalChunks = (int) ((fileSize + (long) chunkSize - 1L) / (long) chunkSize);
+
+        lastPull.set(new PullState(filePath.toString(), aesKey, chunkSize, totalChunks, fileSize));
+
+        try {
+            Map<String, Object> obj = Map.of(
+                    "response", "0",
+                    "aes_key", Base64.getEncoder().encodeToString(aesKey),
+                    "chunk_size", chunkSize,
+                    "total_chunks", totalChunks,
+                    "file_size", fileSize
+            );
+            String json = objectMapper.writeValueAsString(obj);
             return send_file_json_internal(req.name, json);
         } catch (Exception ex) {
             return "2";
@@ -560,7 +663,7 @@ public class Passage_Controller {
         return encrypted + "|" + Base64.getEncoder().encodeToString(signature);
     }
 
-    // Base64 AES-GCM (still used by pull side in this file)
+    // Base64 AES-GCM (old pull zip endpoint)
     private String encrypt_aes_gcm(byte[] data, byte[] key) throws Exception {
         byte[] iv = new byte[12];
         new SecureRandom().nextBytes(iv);
@@ -579,27 +682,25 @@ public class Passage_Controller {
                 Base64.getEncoder().encodeToString(tag);
     }
 
-    // Base64 AES-GCM decrypt (old) - no longer used by pushzip in chunk mode
-    private byte[] decrypt_aes_gcm(byte[] payload, byte[] key) throws Exception {
-        String raw = new String(payload, StandardCharsets.UTF_8);
-        String[] parts = raw.split("\\|", 3);
-        if (parts.length != 3) {
-            throw new IllegalArgumentException("invalid aes payload");
-        }
-        byte[] iv = Base64.getDecoder().decode(parts[0]);
-        byte[] ct = Base64.getDecoder().decode(parts[1]);
-        byte[] tag = Base64.getDecoder().decode(parts[2]);
-        byte[] combined = new byte[ct.length + tag.length];
-        System.arraycopy(ct, 0, combined, 0, ct.length);
-        System.arraycopy(tag, 0, combined, ct.length, tag.length);
+    // NEW: binary AES-GCM encrypt for chunk responses -> returns [iv(12)][ct...][tag(16)]
+    private byte[] encrypt_aes_gcm_binary(byte[] plain, byte[] key) throws Exception {
+        byte[] iv = new byte[12];
+        new SecureRandom().nextBytes(iv);
 
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         GCMParameterSpec spec = new GCMParameterSpec(128, iv);
-        cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec);
-        return cipher.doFinal(combined);
+        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), spec);
+
+        byte[] out = cipher.doFinal(plain); // ct+tag together
+        // out already ends with 16-byte tag
+
+        ByteArrayOutputStream bos = new ByteArrayOutputStream(iv.length + out.length);
+        bos.write(iv);
+        bos.write(out);
+        return bos.toByteArray();
     }
 
-    // NEW: binary AES-GCM decrypt for chunk payloads
+    // NEW: binary AES-GCM decrypt for push chunks
     private byte[] decrypt_aes_gcm_binary(byte[] iv, byte[] ct, byte[] tag, byte[] key) throws Exception {
         byte[] combined = new byte[ct.length + tag.length];
         System.arraycopy(ct, 0, combined, 0, ct.length);
@@ -611,6 +712,16 @@ public class Passage_Controller {
         return cipher.doFinal(combined);
     }
 
+    private static byte[] readFileRange(Path file, long offset, int len) throws Exception {
+        // RandomAccessFile ile stable: seek + readFully
+        try (RandomAccessFile raf = new RandomAccessFile(file.toFile(), "r")) {
+            raf.seek(offset);
+            byte[] buf = new byte[len];
+            raf.readFully(buf);
+            return buf;
+        }
+    }
+
     private static int readIntLE(byte[] b, int off) {
         return (b[off] & 0xFF)
                 | ((b[off + 1] & 0xFF) << 8)
@@ -618,10 +729,16 @@ public class Passage_Controller {
                 | ((b[off + 3] & 0xFF) << 24);
     }
 
+    private static void writeIntLE(ByteArrayOutputStream out, int v) {
+        out.write(v & 0xFF);
+        out.write((v >> 8) & 0xFF);
+        out.write((v >> 16) & 0xFF);
+        out.write((v >> 24) & 0xFF);
+    }
+
     private static void cleanupDirQuiet(Path dir) {
         if (dir == null) return;
         try {
-            // delete children first
             Files.walk(dir)
                     .sorted((a, b) -> b.compareTo(a))
                     .forEach(p -> {
@@ -715,42 +832,18 @@ public class Passage_Controller {
                 throw ex;
             }
         }
-        log.warn("RSA private key class: {}", privateKey.getClass().getName());
 
-        Cipher cipher;
-        try {
-            cipher = Cipher.getInstance("RSA/ECB/OAEPPadding");
-        } catch (Exception ex) {
-            log.warn("RSA decrypt debug: Cipher.getInstance failed: {}", ex.toString());
-            throw ex;
-        }
-        try {
-            OAEPParameterSpec oaep = new OAEPParameterSpec(
-                    "SHA-256",
-                    "MGF1",
-                    MGF1ParameterSpec.SHA256,
-                    PSource.PSpecified.DEFAULT
-            );
-            cipher.init(Cipher.DECRYPT_MODE, privateKey, oaep);
-        } catch (Exception ex) {
-            log.warn("RSA decrypt debug: cipher.init failed: {}", ex.toString());
-            throw ex;
-        }
-        byte[] encrypted;
-        try {
-            encrypted = Base64.getDecoder().decode(input);
-            log.warn("RSA decrypt debug: encrypted bytes len={}", encrypted.length);
-        } catch (Exception ex) {
-            log.warn("RSA decrypt debug: payload base64 decode failed: {}", ex.toString());
-            throw ex;
-        }
-        byte[] plain;
-        try {
-            plain = cipher.doFinal(encrypted);
-        } catch (Exception ex) {
-            log.warn("RSA decrypt debug: cipher.doFinal failed: {}", ex.toString());
-            throw ex;
-        }
+        Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPPadding");
+        OAEPParameterSpec oaep = new OAEPParameterSpec(
+                "SHA-256",
+                "MGF1",
+                MGF1ParameterSpec.SHA256,
+                PSource.PSpecified.DEFAULT
+        );
+        cipher.init(Cipher.DECRYPT_MODE, privateKey, oaep);
+
+        byte[] encrypted = Base64.getDecoder().decode(input);
+        byte[] plain = cipher.doFinal(encrypted);
         return new String(plain, StandardCharsets.UTF_8);
     }
 
@@ -768,12 +861,8 @@ public class Passage_Controller {
     }
 
     private byte[] encodeLength(int len) {
-        if (len < 0x80) {
-            return new byte[] { (byte) len };
-        }
-        if (len <= 0xFF) {
-            return new byte[] { (byte) 0x81, (byte) len };
-        }
+        if (len < 0x80) return new byte[] { (byte) len };
+        if (len <= 0xFF) return new byte[] { (byte) 0x81, (byte) len };
         return new byte[] { (byte) 0x82, (byte) (len >> 8), (byte) (len & 0xFF) };
     }
 
@@ -790,27 +879,17 @@ public class Passage_Controller {
     }
 
     private byte[] sign_payload(byte[] payload) throws Exception {
-        if (payload == null || payload.length == 0) {
-            throw new IllegalArgumentException("missing payload");
-        }
-        if (hmacKey == null || hmacKey.isBlank()) {
-            throw new IllegalStateException("missing hmac key");
-        }
+        if (payload == null || payload.length == 0) throw new IllegalArgumentException("missing payload");
+        if (hmacKey == null || hmacKey.isBlank()) throw new IllegalStateException("missing hmac key");
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(hmacKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         return mac.doFinal(payload);
     }
 
     private boolean verify_signature(byte[] payload, byte[] signature) throws Exception {
-        if (payload == null || payload.length == 0) {
-            throw new IllegalArgumentException("missing payload");
-        }
-        if (signature == null || signature.length == 0) {
-            throw new IllegalArgumentException("missing signature");
-        }
-        if (hmacKey == null || hmacKey.isBlank()) {
-            throw new IllegalStateException("missing hmac key");
-        }
+        if (payload == null || payload.length == 0) throw new IllegalArgumentException("missing payload");
+        if (signature == null || signature.length == 0) throw new IllegalArgumentException("missing signature");
+        if (hmacKey == null || hmacKey.isBlank()) throw new IllegalStateException("missing hmac key");
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(hmacKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         byte[] expected = mac.doFinal(payload);
@@ -876,9 +955,17 @@ public class Passage_Controller {
         private final String filePath;
         private final byte[] aesKey;
 
-        private PullState(String filePath, byte[] aesKey) {
+        // new pull chunk metadata
+        private final int chunkSize;
+        private final int totalChunks;
+        private final long fileSize;
+
+        private PullState(String filePath, byte[] aesKey, int chunkSize, int totalChunks, long fileSize) {
             this.filePath = filePath;
             this.aesKey = aesKey;
+            this.chunkSize = chunkSize;
+            this.totalChunks = totalChunks;
+            this.fileSize = fileSize;
         }
     }
 
