@@ -1,4 +1,4 @@
-Yetkiler: {
+﻿Yetkiler: {
     case 0: return "Public Puller";
     case 1: return "Public Puller + Pusher";
     case 2: return "Public Admin";
