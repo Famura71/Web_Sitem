@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
-@SpringBootApplication(scanBasePackages = {"Main", "Server", "Database", "Transfer"})
+@SpringBootApplication(scanBasePackages = {"Main", "Server", "Database", "Transfer", "Aphrodite"})
 @EntityScan(basePackages = {"Transfer.Hibernate"})
 @EnableJpaRepositories(basePackages = {"Transfer.Hibernate"})
 public class Main {
