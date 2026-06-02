@@ -1,44 +1,66 @@
+# Maven / Java
 target/
-!.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.ear
+
+# Keep nested example build folders if they ever exist under sources.
 !**/src/main/**/target/
 !**/src/test/**/target/
-.kotlin
+!**/src/main/**/build/
+!**/src/test/**/build/
 
-### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
+# Kotlin
+.kotlin/
+
+# IntelliJ IDEA
+.idea/
 *.iws
 *.iml
 *.ipr
 
-### Eclipse ###
+# Eclipse / STS
 .apt_generated
 .classpath
 .factorypath
 .project
-.settings
+.settings/
 .springBeans
 .sts4-cache
 
-### NetBeans ###
+# NetBeans
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
 
-### VS Code ###
+# VS Code
 .vscode/
 
-### Mac OS ###
+# OS files
 .DS_Store
+Thumbs.db
 
-### App data ###
-/web_sitem.db
-/src/resources/application.properties
-/src/resources/database/
+# Logs / temp
+*.log
+*.tmp
+*.swp
+
+# Local database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Local app config and secrets
+.env
+.env.*
+src/main/resources/application.properties
+
+# Local runtime content
+src/main/resources/Database/
+src/main/resources/Archive/

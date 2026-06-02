@@ -1,5 +1,9 @@
 package Transfer.Passage;
 
+import Transfer.Hibernate.PrivateResource;
+import Transfer.Hibernate.PrivateResourceRepository;
+import Transfer.Hibernate.PublicResource;
+import Transfer.Hibernate.PublicResourceRepository;
 import Transfer.Hibernate.ResourceVersion;
 import Transfer.Hibernate.ResourceVersionRepository;
 import org.slf4j.Logger;
@@ -24,7 +28,9 @@ import java.util.stream.Stream;
 public class ResourceVersionSyncService {
     private static final Logger log = LoggerFactory.getLogger(ResourceVersionSyncService.class);
 
-    private final ResourceVersionRepository repo;
+    private final ResourceVersionRepository resourceVersionRepository;
+    private final PublicResourceRepository publicResourceRepository;
+    private final PrivateResourceRepository privateResourceRepository;
 
     @Value("${resources.public.path:src/main/resources/Database/Public}")
     private String publicPath;
@@ -32,26 +38,32 @@ public class ResourceVersionSyncService {
     @Value("${resources.private.path:src/main/resources/Database/Private}")
     private String privatePath;
 
-    public ResourceVersionSyncService(ResourceVersionRepository repo) {
-        this.repo = repo;
+    public ResourceVersionSyncService(ResourceVersionRepository resourceVersionRepository,
+                                      PublicResourceRepository publicResourceRepository,
+                                      PrivateResourceRepository privateResourceRepository) {
+        this.resourceVersionRepository = resourceVersionRepository;
+        this.publicResourceRepository = publicResourceRepository;
+        this.privateResourceRepository = privateResourceRepository;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void syncAll() {
+        Set<String> publicResources = scanResourceNames(publicPath);
+        Set<String> privateResources = scanResourceNames(privatePath);
+
+        syncPublicResources(publicResources);
+        syncPrivateResources(privateResources);
+
         List<ResourceVersion> collected = new ArrayList<>();
         collected.addAll(scanScope("Public", publicPath));
         collected.addAll(scanScope("Private", privatePath));
-
-        if (collected.isEmpty()) {
-            return;
-        }
 
         Set<String> incomingKeys = collected.stream()
                 .map(ResourceVersionSyncService::keyOf)
                 .collect(Collectors.toSet());
 
-        List<ResourceVersion> existing = repo.findAll();
+        List<ResourceVersion> existing = resourceVersionRepository.findAll();
         Set<String> existingKeys = existing.stream()
                 .map(ResourceVersionSyncService::keyOf)
                 .collect(Collectors.toSet());
@@ -63,7 +75,7 @@ public class ResourceVersionSyncService {
             List<ResourceVersion> deleteEntities = existing.stream()
                     .filter(rv -> toDelete.contains(keyOf(rv)))
                     .collect(Collectors.toList());
-            repo.deleteAll(deleteEntities);
+            resourceVersionRepository.deleteAll(deleteEntities);
         }
 
         List<ResourceVersion> toInsert = collected.stream()
@@ -71,10 +83,72 @@ public class ResourceVersionSyncService {
                 .collect(Collectors.toList());
 
         if (!toInsert.isEmpty()) {
-            repo.saveAll(toInsert);
+            resourceVersionRepository.saveAll(toInsert);
         }
 
-        log.info("resources_versions sync: +{} -{}", toInsert.size(), toDelete.size());
+        log.info("resource sync: public={} private={} versions +{} -{}",
+                publicResources.size(), privateResources.size(), toInsert.size(), toDelete.size());
+    }
+
+    private Set<String> scanResourceNames(String basePath) {
+        Path base = Path.of(basePath);
+        if (!Files.exists(base) || !Files.isDirectory(base)) {
+            log.warn("Resource path not found: {}", basePath);
+            return Set.of();
+        }
+
+        try (Stream<Path> folders = Files.list(base)) {
+            return folders.filter(Files::isDirectory)
+                    .map(path -> path.getFileName().toString())
+                    .collect(Collectors.toSet());
+        } catch (IOException ex) {
+            log.warn("Failed scanning resource folders at {}", basePath, ex);
+            return Set.of();
+        }
+    }
+
+    private void syncPublicResources(Set<String> incomingNames) {
+        List<PublicResource> existing = publicResourceRepository.findAll();
+        Set<String> existingNames = existing.stream()
+                .map(PublicResource::getName)
+                .collect(Collectors.toSet());
+
+        List<PublicResource> toDelete = existing.stream()
+                .filter(resource -> !incomingNames.contains(resource.getName()))
+                .collect(Collectors.toList());
+        if (!toDelete.isEmpty()) {
+            publicResourceRepository.deleteAll(toDelete);
+        }
+
+        List<PublicResource> toInsert = incomingNames.stream()
+                .filter(name -> !existingNames.contains(name))
+                .map(PublicResource::new)
+                .collect(Collectors.toList());
+        if (!toInsert.isEmpty()) {
+            publicResourceRepository.saveAll(toInsert);
+        }
+    }
+
+    private void syncPrivateResources(Set<String> incomingNames) {
+        List<PrivateResource> existing = privateResourceRepository.findAll();
+        Set<String> existingNames = existing.stream()
+                .map(PrivateResource::getName)
+                .collect(Collectors.toSet());
+
+        List<PrivateResource> toDelete = existing.stream()
+                .filter(resource -> !incomingNames.contains(resource.getName()))
+                .collect(Collectors.toList());
+        if (!toDelete.isEmpty()) {
+            privateResourceRepository.deleteAll(toDelete);
+        }
+
+        List<PrivateResource> toInsert = incomingNames.stream()
+                .filter(name -> !existingNames.contains(name))
+                .map(PrivateResource::new)
+                .collect(Collectors.toList());
+        if (!toInsert.isEmpty()) {
+            privateResourceRepository.saveAll(toInsert);
+        }
     }
 
     private List<ResourceVersion> scanScope(String scope, String basePath) {
