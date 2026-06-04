@@ -1,4 +1,4 @@
-package Aphrodite;
+package Fafnir;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -11,17 +11,17 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class AphroditeAuthService {
+public class FafnirAuthService {
     private final SecureRandom secureRandom = new SecureRandom();
     private final Map<String, Instant> sessions = new ConcurrentHashMap<>();
 
-    @Value("${aphrodite.login.username:aphrodite}")
+    @Value("${fafnir.login.username:fafnir}")
     private String expectedUsername;
 
-    @Value("${aphrodite.login.password:aphrodite-2026}")
+    @Value("${fafnir.login.password:fafnir-2026}")
     private String expectedPassword;
 
-    @Value("${aphrodite.session.ttl-seconds:7200}")
+    @Value("${fafnir.session.ttl-seconds:7200}")
     private long sessionTtlSeconds;
 
     public LoginResult login(String username, String password) {

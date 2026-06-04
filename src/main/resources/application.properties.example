@@ -1,0 +1,64 @@
+spring.servlet.multipart.max-file-size=50MB
+spring.servlet.multipart.max-request-size=50MB
+
+# SMTP settings (Gmail)
+# Secret
+spring.mail.host=
+# Secret
+spring.mail.port=
+# Secret
+spring.mail.username=
+# Secret
+spring.mail.password=
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+
+# Recipient
+# Secret
+contact.recipient=
+
+# SQLite datasource
+spring.datasource.url=jdbc:sqlite:./web_sitem.db
+spring.datasource.driver-class-name=org.sqlite.JDBC
+
+# JPA / Hibernate
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.database-platform=org.hibernate.community.dialect.SQLiteDialect
+
+# Private API (HMAC)
+private.api.paths=/api/private/transfer,/api/passage/receive
+# Secret
+private.api.client-id=
+# Secret
+private.api.secret=
+private.api.max-skew-seconds=60
+private.api.nonce-ttl-seconds=300
+private.api.stealth=false
+private.api.debug=true
+# Secret
+private.api.hmac-key=
+
+# RSA private key (base64 DER, PKCS#8)
+# Secret
+private.api.rsa-private-key-base64=
+
+# Resource scan paths
+resources.public.path=src/main/resources/Database/Public
+resources.private.path=src/main/resources/Database/Private
+
+# Fafnir archive
+fafnir.archive.root-path=src/main/resources/Archive
+fafnir.db.path=./Fafnir.db
+# Secret
+fafnir.login.username=
+# Secret
+fafnir.login.password=
+fafnir.session.ttl-seconds=7200
+fafnir.crypto.max-skew-seconds=60
+fafnir.crypto.nonce-ttl-seconds=300
+# Secret
+fafnir.crypto.hmac-key=
+# Secret
+fafnir.crypto.rsa-private-key-base64=

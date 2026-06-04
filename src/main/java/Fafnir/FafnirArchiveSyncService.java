@@ -1,4 +1,4 @@
-package Aphrodite;
+package Fafnir;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,13 +23,13 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 @Service
-public class AphroditeArchiveSyncService {
-    private static final Logger log = LoggerFactory.getLogger(AphroditeArchiveSyncService.class);
+public class FafnirArchiveSyncService {
+    private static final Logger log = LoggerFactory.getLogger(FafnirArchiveSyncService.class);
 
-    @Value("${aphrodite.archive.root-path:src/main/resources/Archive}")
+    @Value("${fafnir.archive.root-path:src/main/resources/Archive}")
     private String archiveRootPath;
 
-    @Value("${aphrodite.db.path:./Aphrodite.db}")
+    @Value("${fafnir.db.path:./Fafnir.db}")
     private String databasePath;
 
     @EventListener(ApplicationReadyEvent.class)
@@ -42,7 +42,7 @@ public class AphroditeArchiveSyncService {
         try {
             Files.createDirectories(root);
         } catch (IOException ex) {
-            log.warn("Failed to create Aphrodite archive root: {}", root, ex);
+            log.warn("Failed to create Fafnir archive root: {}", root, ex);
         }
 
         ensureSchemaQuietly();
@@ -103,9 +103,9 @@ public class AphroditeArchiveSyncService {
             }
 
             connection.commit();
-            log.info("Aphrodite archive sync complete. items={}", rows.size());
+            log.info("Fafnir archive sync complete. items={}", rows.size());
         } catch (Exception ex) {
-            log.warn("Aphrodite archive sync failed", ex);
+            log.warn("Fafnir archive sync failed", ex);
         }
     }
 
@@ -130,7 +130,7 @@ public class AphroditeArchiveSyncService {
                 }
             }
         } catch (Exception ex) {
-            log.warn("Aphrodite archive list failed for parent={}", normalizedParent, ex);
+            log.warn("Fafnir archive list failed for parent={}", normalizedParent, ex);
         }
 
         return items;
@@ -154,7 +154,7 @@ public class AphroditeArchiveSyncService {
                 }
             }
         } catch (Exception ex) {
-            log.warn("Aphrodite archive lookup failed for path={}", normalized, ex);
+            log.warn("Fafnir archive lookup failed for path={}", normalized, ex);
         }
         return null;
     }
@@ -202,7 +202,7 @@ public class AphroditeArchiveSyncService {
                 ));
             });
         } catch (IOException ex) {
-            log.warn("Aphrodite archive scan failed at {}", root, ex);
+            log.warn("Fafnir archive scan failed at {}", root, ex);
         }
         return rows;
     }
@@ -239,7 +239,7 @@ public class AphroditeArchiveSyncService {
                     )
                     """);
         } catch (Exception ex) {
-            log.warn("Aphrodite archive schema init failed", ex);
+            log.warn("Fafnir archive schema init failed", ex);
         }
     }
 
