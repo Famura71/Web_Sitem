@@ -63,7 +63,7 @@ public class FafnirController {
         try {
             username = secureService.readUsername(payload);
             password = secureService.readPassword(payload);
-            String clientPublicKey = secureService.readClientPublicKey(payload);
+            String clientPublicKey = request.clientPublicKeyBase64();
             if (isBlank(clientPublicKey)) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new LoginResponse(false, null, "Missing client public key"));
             }
@@ -246,7 +246,7 @@ public class FafnirController {
         return value == null || value.isBlank();
     }
 
-    public record SecureEnvelopeRequest(String payload, String signature) {
+    public record SecureEnvelopeRequest(String payload, String signature, String clientPublicKeyBase64) {
     }
 
     public record LoginResponse(boolean ok, String token, String message) {
