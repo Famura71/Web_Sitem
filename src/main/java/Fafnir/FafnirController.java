@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -21,6 +23,7 @@ import java.util.List;
 
 @RestController
 public class FafnirController {
+    private static final Logger log = LoggerFactory.getLogger(FafnirController.class);
     private final FafnirAuthService authService;
     private final FafnirArchiveSyncService archiveService;
     private final FafnirSecureService secureService;
@@ -48,6 +51,7 @@ public class FafnirController {
         try {
             payload = secureService.decryptEnvelope(request.payload(), request.signature());
         } catch (IllegalArgumentException ex) {
+            log.warn("Fafnir login secure payload rejected: {}", ex.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new LoginResponse(false, null, "Invalid secure payload"));
         }
 
@@ -80,6 +84,7 @@ public class FafnirController {
         try {
             payload = secureService.decryptEnvelope(request.payload(), request.signature());
         } catch (IllegalArgumentException ex) {
+            log.warn("Fafnir archive list secure payload rejected: {}", ex.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
 
@@ -107,6 +112,7 @@ public class FafnirController {
         try {
             payload = secureService.decryptEnvelope(request.payload(), request.signature());
         } catch (IllegalArgumentException ex) {
+            log.warn("Fafnir archive ticket secure payload rejected: {}", ex.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
 

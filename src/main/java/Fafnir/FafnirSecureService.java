@@ -15,6 +15,7 @@ import java.security.SecureRandom;
 import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPublicKeySpec;
+import java.security.spec.MGF1ParameterSpec;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
@@ -22,6 +23,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.crypto.spec.OAEPParameterSpec;
+import javax.crypto.spec.PSource;
 import org.json.JSONObject;
 
 @Service
@@ -140,7 +143,16 @@ public class FafnirSecureService {
     private String decryptPayload(String payload) {
         try {
             Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-            cipher.init(Cipher.DECRYPT_MODE, privateKey);
+            cipher.init(
+                    Cipher.DECRYPT_MODE,
+                    privateKey,
+                    new OAEPParameterSpec(
+                            "SHA-256",
+                            "MGF1",
+                            MGF1ParameterSpec.SHA256,
+                            PSource.PSpecified.DEFAULT
+                    )
+            );
             byte[] decoded = Base64.getDecoder().decode(payload);
             byte[] plain = cipher.doFinal(decoded);
             return new String(plain, StandardCharsets.UTF_8);
