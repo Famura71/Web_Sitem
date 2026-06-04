@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import javax.crypto.Cipher;
 import javax.crypto.CipherOutputStream;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -169,11 +170,11 @@ public class FafnirController {
 
         StreamingResponseBody body = outputStream -> {
             try {
-                Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+                Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
                 cipher.init(
                         Cipher.ENCRYPT_MODE,
                         new SecretKeySpec(record.aesKey(), "AES"),
-                        new GCMParameterSpec(128, record.iv())
+                        new IvParameterSpec(record.iv())
                 );
                 try (InputStream input = java.nio.file.Files.newInputStream(resolved);
                      CipherOutputStream cipherOutputStream = new CipherOutputStream(outputStream, cipher)) {
@@ -187,7 +188,7 @@ public class FafnirController {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
-                .header("X-Fafnir-Content-Encryption", "AES/GCM/NoPadding")
+                .header("X-Fafnir-Content-Encryption", "AES/CTR/NoPadding")
                 .header("X-Fafnir-Content-IV", Base64.getEncoder().encodeToString(record.iv()))
                 .header("X-Fafnir-Content-Original-MimeType", originalMimeType)
                 .body(body);

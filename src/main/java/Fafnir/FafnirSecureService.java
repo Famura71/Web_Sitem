@@ -85,7 +85,7 @@ public class FafnirSecureService {
         String ticket = randomToken();
         Instant expiresAt = Instant.now().plusSeconds(180);
         byte[] aesKey = randomBytes(32);
-        byte[] iv = randomBytes(12);
+        byte[] iv = randomBytes(16);
         byte[] wrapIv = randomBytes(12);
         downloadTickets.put(ticket, new TicketRecord(normalized, expiresAt, token, aesKey, iv));
         cleanupTickets();
