@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class FafnirAuthService {
     private final SecureRandom secureRandom = new SecureRandom();
-    private final Map<String, Instant> sessions = new ConcurrentHashMap<>();
+    private final Map<String, SessionRecord> sessions = new ConcurrentHashMap<>();
 
     @Value("${fafnir.login.username:fafnir}")
     private String expectedUsername;
@@ -24,14 +24,17 @@ public class FafnirAuthService {
     @Value("${fafnir.session.ttl-seconds:7200}")
     private long sessionTtlSeconds;
 
-    public LoginResult login(String username, String password) {
+    public LoginResult login(String username, String password, String clientPublicKeyBase64) {
         if (!expectedUsername.equals(username) || !expectedPassword.equals(password)) {
             return new LoginResult(false, null, "Invalid credentials");
+        }
+        if (clientPublicKeyBase64 == null || clientPublicKeyBase64.isBlank()) {
+            return new LoginResult(false, null, "Missing client public key");
         }
 
         cleanupExpiredSessions();
         String token = issueToken();
-        sessions.put(token, Instant.now().plusSeconds(sessionTtlSeconds));
+        sessions.put(token, new SessionRecord(Instant.now().plusSeconds(sessionTtlSeconds), clientPublicKeyBase64));
         return new LoginResult(true, token, "ok");
     }
 
@@ -41,15 +44,29 @@ public class FafnirAuthService {
         }
 
         cleanupExpiredSessions();
-        Instant expiresAt = sessions.get(token);
-        if (expiresAt == null) {
+        SessionRecord record = sessions.get(token);
+        if (record == null) {
             return false;
         }
-        if (Instant.now().isAfter(expiresAt)) {
+        if (Instant.now().isAfter(record.expiresAt())) {
             sessions.remove(token);
             return false;
         }
         return true;
+    }
+
+    public String getClientPublicKey(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+
+        cleanupExpiredSessions();
+        SessionRecord record = sessions.get(token);
+        if (record == null || Instant.now().isAfter(record.expiresAt())) {
+            sessions.remove(token);
+            return null;
+        }
+        return record.clientPublicKeyBase64();
     }
 
     private String issueToken() {
@@ -60,9 +77,12 @@ public class FafnirAuthService {
 
     private void cleanupExpiredSessions() {
         Instant now = Instant.now();
-        sessions.entrySet().removeIf(entry -> now.isAfter(entry.getValue()));
+        sessions.entrySet().removeIf(entry -> now.isAfter(entry.getValue().expiresAt()));
     }
 
     public record LoginResult(boolean ok, String token, String message) {
+    }
+
+    private record SessionRecord(Instant expiresAt, String clientPublicKeyBase64) {
     }
 }

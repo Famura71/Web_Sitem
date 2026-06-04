@@ -5,20 +5,23 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.MediaTypeFactory;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.crypto.Cipher;
+import javax.crypto.CipherOutputStream;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.List;
 
 @RestController
@@ -60,18 +63,18 @@ public class FafnirController {
         try {
             username = secureService.readUsername(payload);
             password = secureService.readPassword(payload);
+            String clientPublicKey = secureService.readClientPublicKey(payload);
+            if (isBlank(clientPublicKey)) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new LoginResponse(false, null, "Missing client public key"));
+            }
+            FafnirAuthService.LoginResult result = authService.login(username, password, clientPublicKey);
+            if (!result.ok()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new LoginResponse(false, null, result.message()));
+            }
+            return ResponseEntity.ok(new LoginResponse(true, result.token(), "ok"));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new LoginResponse(false, null, "Missing credentials"));
         }
-        if (isBlank(username) || isBlank(password)) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new LoginResponse(false, null, "Missing credentials"));
-        }
-
-        FafnirAuthService.LoginResult result = authService.login(username, password);
-        if (!result.ok()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new LoginResponse(false, null, result.message()));
-        }
-        return ResponseEntity.ok(new LoginResponse(true, result.token(), "ok"));
     }
 
     @PostMapping(value = "/api/fafnir/archive/list", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -134,11 +137,16 @@ public class FafnirController {
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(new DownloadTicketResponse(ticket.ticket(), ticket.expiresAtEpochMs()));
+        return ResponseEntity.ok(new DownloadTicketResponse(
+                ticket.ticket(),
+                ticket.expiresAtEpochMs(),
+                ticket.wrappedAesKeyBase64(),
+                ticket.ivBase64()
+        ));
     }
 
     @GetMapping(value = "/api/fafnir/archive/file")
-    public ResponseEntity<Resource> download(@RequestParam("ticket") String ticket) {
+    public ResponseEntity<StreamingResponseBody> download(@RequestParam("ticket") String ticket) {
         FafnirSecureService.TicketRecord record = secureService.consumeTicket(ticket);
         if (record == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -155,18 +163,37 @@ public class FafnirController {
             return ResponseEntity.notFound().build();
         }
 
-        Resource resource = new FileSystemResource(resolved);
-        MediaType mediaType = MediaTypeFactory.getMediaType(resolved.getFileName().toString())
-                .orElse(MediaType.APPLICATION_OCTET_STREAM);
+        FafnirArchiveSyncService.ArchiveItem item = archiveService.findItem(record.relativePath());
+        String originalMimeType = item == null ? "application/octet-stream" : item.mimeType();
 
         ContentDisposition contentDisposition = ContentDisposition.attachment()
                 .filename(resolved.getFileName().toString(), StandardCharsets.UTF_8)
                 .build();
 
+        StreamingResponseBody body = outputStream -> {
+            try {
+                Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+                cipher.init(
+                        Cipher.ENCRYPT_MODE,
+                        new SecretKeySpec(record.aesKey(), "AES"),
+                        new GCMParameterSpec(128, record.iv())
+                );
+                try (InputStream input = java.nio.file.Files.newInputStream(resolved);
+                     CipherOutputStream cipherOutputStream = new CipherOutputStream(outputStream, cipher)) {
+                    input.transferTo(cipherOutputStream);
+                }
+            } catch (Exception ex) {
+                throw new IllegalStateException("Failed to stream encrypted archive file", ex);
+            }
+        };
+
         return ResponseEntity.ok()
-                .contentType(mediaType)
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
-                .body(resource);
+                .header("X-Fafnir-Content-Encryption", "AES/GCM/NoPadding")
+                .header("X-Fafnir-Content-IV", Base64.getEncoder().encodeToString(record.iv()))
+                .header("X-Fafnir-Content-Original-MimeType", originalMimeType)
+                .body(body);
     }
 
     private ArchiveListResponse buildListResponse(String path) {
@@ -231,7 +258,7 @@ public class FafnirController {
     public record PublicKeyResponse(String algorithm, String publicKeyBase64) {
     }
 
-    public record DownloadTicketResponse(String ticket, long expiresAtEpochMs) {
+    public record DownloadTicketResponse(String ticket, long expiresAtEpochMs, String wrappedAesKeyBase64, String ivBase64) {
     }
 
     public record ArchiveItemResponse(

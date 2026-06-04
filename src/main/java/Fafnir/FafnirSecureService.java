@@ -15,6 +15,7 @@ import java.security.SecureRandom;
 import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPublicKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.security.spec.MGF1ParameterSpec;
 import java.time.Duration;
 import java.time.Instant;
@@ -76,6 +77,10 @@ public class FafnirSecureService {
         if (!authService.isTokenValid(token)) {
             throw new IllegalArgumentException("Invalid session token");
         }
+        String clientPublicKeyBase64 = authService.getClientPublicKey(token);
+        if (clientPublicKeyBase64 == null || clientPublicKeyBase64.isBlank()) {
+            throw new IllegalArgumentException("Missing client public key");
+        }
         String normalized = normalize(path);
         FafnirArchiveSyncService.ArchiveItem item = archiveService.findItem(normalized);
         if (item == null || item.directory()) {
@@ -84,9 +89,12 @@ public class FafnirSecureService {
 
         String ticket = randomToken();
         Instant expiresAt = Instant.now().plusSeconds(180);
-        downloadTickets.put(ticket, new TicketRecord(normalized, expiresAt, token));
+        byte[] aesKey = randomBytes(32);
+        byte[] iv = randomBytes(12);
+        downloadTickets.put(ticket, new TicketRecord(normalized, expiresAt, token, aesKey, iv));
         cleanupTickets();
-        return new DownloadTicket(ticket, expiresAt.toEpochMilli());
+        String wrappedAesKey = wrapForClient(clientPublicKeyBase64, aesKey);
+        return new DownloadTicket(ticket, expiresAt.toEpochMilli(), wrappedAesKey, Base64.getEncoder().encodeToString(iv));
     }
 
     public TicketRecord consumeTicket(String ticket) {
@@ -122,6 +130,10 @@ public class FafnirSecureService {
 
     public String readPassword(JSONObject payload) {
         return payload.optString("password", "");
+    }
+
+    public String readClientPublicKey(JSONObject payload) {
+        return payload.optString("clientPublicKeyBase64", "");
     }
 
     private void verifyHmac(String payload, String signature) {
@@ -210,6 +222,34 @@ public class FafnirSecureService {
         }
     }
 
+    private String wrapForClient(String clientPublicKeyBase64, byte[] aesKey) {
+        try {
+            byte[] decoded = Base64.getDecoder().decode(clientPublicKeyBase64);
+            PublicKey clientPublicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(decoded));
+            Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+            cipher.init(
+                    Cipher.ENCRYPT_MODE,
+                    clientPublicKey,
+                    new OAEPParameterSpec(
+                            "SHA-256",
+                            "MGF1",
+                            MGF1ParameterSpec.SHA256,
+                            PSource.PSpecified.DEFAULT
+                    )
+            );
+            byte[] wrapped = cipher.doFinal(aesKey);
+            return Base64.getEncoder().encodeToString(wrapped);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Failed to wrap download key", ex);
+        }
+    }
+
+    private byte[] randomBytes(int length) {
+        byte[] bytes = new byte[length];
+        secureRandom.nextBytes(bytes);
+        return bytes;
+    }
+
     private String normalize(String value) {
         if (value == null || value.isBlank()) {
             return "";
@@ -230,9 +270,9 @@ public class FafnirSecureService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    public record DownloadTicket(String ticket, long expiresAtEpochMs) {
+    public record DownloadTicket(String ticket, long expiresAtEpochMs, String wrappedAesKeyBase64, String ivBase64) {
     }
 
-    public record TicketRecord(String relativePath, Instant expiresAt, String token) {
+    public record TicketRecord(String relativePath, Instant expiresAt, String token, byte[] aesKey, byte[] iv) {
     }
 }
