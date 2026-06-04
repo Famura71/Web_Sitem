@@ -26,7 +26,7 @@ import java.util.stream.Stream;
 public class FafnirArchiveSyncService {
     private static final Logger log = LoggerFactory.getLogger(FafnirArchiveSyncService.class);
 
-    @Value("${fafnir.archive.root-path:src/main/resources/Archive}")
+    @Value("${fafnir.archive.root-path:./Archive}")
     private String archiveRootPath;
 
     @Value("${fafnir.db.path:./Fafnir.db}")

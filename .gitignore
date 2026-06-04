@@ -64,3 +64,4 @@ src/main/resources/application.properties
 # Local runtime content
 src/main/resources/Database/
 src/main/resources/Archive/
+Archive/

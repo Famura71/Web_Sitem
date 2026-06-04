@@ -49,7 +49,7 @@ resources.public.path=src/main/resources/Database/Public
 resources.private.path=src/main/resources/Database/Private
 
 # Fafnir archive
-fafnir.archive.root-path=src/main/resources/Archive
+fafnir.archive.root-path=./Archive
 fafnir.db.path=./Fafnir.db
 # Secret
 fafnir.login.username=
