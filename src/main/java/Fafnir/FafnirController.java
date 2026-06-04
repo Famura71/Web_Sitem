@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherOutputStream;
-import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.InputStream;
@@ -186,6 +185,7 @@ public class FafnirController {
         };
 
         return ResponseEntity.ok()
+                .contentLength(resolved.toFile().length())
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
                 .header("X-Fafnir-Content-Encryption", "AES/CTR/NoPadding")
