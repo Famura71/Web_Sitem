@@ -258,9 +258,9 @@ public class FafnirSecureService {
                     Cipher.ENCRYPT_MODE,
                     clientPublicKey,
                     new OAEPParameterSpec(
-                            "SHA-256",
+                            "SHA-1",
                             "MGF1",
-                            MGF1ParameterSpec.SHA256,
+                            MGF1ParameterSpec.SHA1,
                             PSource.PSpecified.DEFAULT
                     )
             );
