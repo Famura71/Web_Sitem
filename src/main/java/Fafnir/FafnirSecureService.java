@@ -67,7 +67,7 @@ public class FafnirSecureService {
         }
 
         verifyHmac(payload, signature);
-        String json = decryptPayload(payload);
+        String json = decryptHybridPayload(payload);
         JSONObject object = new JSONObject(json);
         validateReplayWindow(object);
         return object;
@@ -152,7 +152,35 @@ public class FafnirSecureService {
         }
     }
 
-    private String decryptPayload(String payload) {
+    private String decryptHybridPayload(String payload) {
+        try {
+            byte[] decoded = Base64.getDecoder().decode(payload);
+            JSONObject packet = new JSONObject(new String(decoded, StandardCharsets.UTF_8));
+            String wrappedKeyBase64 = packet.optString("key", "");
+            String ivBase64 = packet.optString("iv", "");
+            String dataBase64 = packet.optString("data", "");
+            if (wrappedKeyBase64.isBlank() || ivBase64.isBlank() || dataBase64.isBlank()) {
+                throw new IllegalArgumentException("Missing packet fields");
+            }
+
+            byte[] aesKey = unwrapPayloadKey(wrappedKeyBase64);
+            byte[] iv = Base64.getDecoder().decode(ivBase64);
+            byte[] ciphertext = Base64.getDecoder().decode(dataBase64);
+
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(
+                    Cipher.DECRYPT_MODE,
+                    new SecretKeySpec(aesKey, "AES"),
+                    new javax.crypto.spec.GCMParameterSpec(128, iv)
+            );
+            byte[] plain = cipher.doFinal(ciphertext);
+            return new String(plain, StandardCharsets.UTF_8);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Unable to decrypt secure payload", ex);
+        }
+    }
+
+    private byte[] unwrapPayloadKey(String wrappedKeyBase64) {
         try {
             Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
             cipher.init(
@@ -165,11 +193,10 @@ public class FafnirSecureService {
                             PSource.PSpecified.DEFAULT
                     )
             );
-            byte[] decoded = Base64.getDecoder().decode(payload);
-            byte[] plain = cipher.doFinal(decoded);
-            return new String(plain, StandardCharsets.UTF_8);
+            byte[] decoded = Base64.getDecoder().decode(wrappedKeyBase64);
+            return cipher.doFinal(decoded);
         } catch (Exception ex) {
-            throw new IllegalArgumentException("Unable to decrypt secure payload", ex);
+            throw new IllegalArgumentException("Unable to unwrap secure payload key", ex);
         }
     }
 
