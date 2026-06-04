@@ -24,17 +24,14 @@ public class FafnirAuthService {
     @Value("${fafnir.session.ttl-seconds:7200}")
     private long sessionTtlSeconds;
 
-    public LoginResult login(String username, String password, String clientPublicKeyBase64) {
+    public LoginResult login(String username, String password) {
         if (!expectedUsername.equals(username) || !expectedPassword.equals(password)) {
             return new LoginResult(false, null, "Invalid credentials");
-        }
-        if (clientPublicKeyBase64 == null || clientPublicKeyBase64.isBlank()) {
-            return new LoginResult(false, null, "Missing client public key");
         }
 
         cleanupExpiredSessions();
         String token = issueToken();
-        sessions.put(token, new SessionRecord(Instant.now().plusSeconds(sessionTtlSeconds), clientPublicKeyBase64));
+        sessions.put(token, new SessionRecord(Instant.now().plusSeconds(sessionTtlSeconds)));
         return new LoginResult(true, token, "ok");
     }
 
@@ -55,20 +52,6 @@ public class FafnirAuthService {
         return true;
     }
 
-    public String getClientPublicKey(String token) {
-        if (token == null || token.isBlank()) {
-            return null;
-        }
-
-        cleanupExpiredSessions();
-        SessionRecord record = sessions.get(token);
-        if (record == null || Instant.now().isAfter(record.expiresAt())) {
-            sessions.remove(token);
-            return null;
-        }
-        return record.clientPublicKeyBase64();
-    }
-
     private String issueToken() {
         byte[] bytes = new byte[32];
         secureRandom.nextBytes(bytes);
@@ -83,6 +66,6 @@ public class FafnirAuthService {
     public record LoginResult(boolean ok, String token, String message) {
     }
 
-    private record SessionRecord(Instant expiresAt, String clientPublicKeyBase64) {
+    private record SessionRecord(Instant expiresAt) {
     }
 }

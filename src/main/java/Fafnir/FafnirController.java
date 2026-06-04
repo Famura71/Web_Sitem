@@ -63,11 +63,7 @@ public class FafnirController {
         try {
             username = secureService.readUsername(payload);
             password = secureService.readPassword(payload);
-            String clientPublicKey = request.clientPublicKeyBase64();
-            if (isBlank(clientPublicKey)) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new LoginResponse(false, null, "Missing client public key"));
-            }
-            FafnirAuthService.LoginResult result = authService.login(username, password, clientPublicKey);
+            FafnirAuthService.LoginResult result = authService.login(username, password);
             if (!result.ok()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new LoginResponse(false, null, result.message()));
             }
@@ -141,6 +137,7 @@ public class FafnirController {
                 ticket.ticket(),
                 ticket.expiresAtEpochMs(),
                 ticket.wrappedAesKeyBase64(),
+                ticket.wrappedAesKeyIvBase64(),
                 ticket.ivBase64()
         ));
     }
@@ -246,7 +243,7 @@ public class FafnirController {
         return value == null || value.isBlank();
     }
 
-    public record SecureEnvelopeRequest(String payload, String signature, String clientPublicKeyBase64) {
+    public record SecureEnvelopeRequest(String payload, String signature) {
     }
 
     public record LoginResponse(boolean ok, String token, String message) {
@@ -258,7 +255,7 @@ public class FafnirController {
     public record PublicKeyResponse(String algorithm, String publicKeyBase64) {
     }
 
-    public record DownloadTicketResponse(String ticket, long expiresAtEpochMs, String wrappedAesKeyBase64, String ivBase64) {
+    public record DownloadTicketResponse(String ticket, long expiresAtEpochMs, String wrappedAesKeyBase64, String wrappedAesKeyIvBase64, String ivBase64) {
     }
 
     public record ArchiveItemResponse(
