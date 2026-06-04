@@ -19,6 +19,7 @@ import javax.crypto.CipherOutputStream;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Base64;
@@ -143,7 +144,8 @@ public class FafnirController {
     }
 
     @GetMapping(value = "/api/fafnir/archive/file")
-    public ResponseEntity<StreamingResponseBody> download(@RequestParam("ticket") String ticket) {
+    public ResponseEntity<StreamingResponseBody> download(@RequestParam("ticket") String ticket,
+                                                         @RequestParam(value = "start", defaultValue = "0") long start) {
         FafnirSecureService.TicketRecord record = secureService.consumeTicket(ticket);
         if (record == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -159,6 +161,10 @@ public class FafnirController {
         if (!resolved.toFile().isFile()) {
             return ResponseEntity.notFound().build();
         }
+        long fileLength = resolved.toFile().length();
+        if (start < 0L || start > fileLength) {
+            return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE).build();
+        }
 
         FafnirArchiveSyncService.ArchiveItem item = archiveService.findItem(record.relativePath());
         String originalMimeType = item == null ? "application/octet-stream" : item.mimeType();
@@ -173,10 +179,22 @@ public class FafnirController {
                 cipher.init(
                         Cipher.ENCRYPT_MODE,
                         new SecretKeySpec(record.aesKey(), "AES"),
-                        new IvParameterSpec(record.iv())
+                        new IvParameterSpec(advanceCtrIv(record.iv(), start / 16L))
                 );
                 try (InputStream input = java.nio.file.Files.newInputStream(resolved);
                      CipherOutputStream cipherOutputStream = new CipherOutputStream(outputStream, cipher)) {
+                    long skipped = 0L;
+                    while (skipped < start) {
+                        long current = input.skip(start - skipped);
+                        if (current <= 0L) {
+                            break;
+                        }
+                        skipped += current;
+                    }
+                    int remainder = (int) (start % 16L);
+                    if (remainder > 0) {
+                        cipher.update(new byte[remainder]);
+                    }
                     input.transferTo(cipherOutputStream);
                 }
             } catch (Exception ex) {
@@ -184,14 +202,39 @@ public class FafnirController {
             }
         };
 
-        return ResponseEntity.ok()
-                .contentLength(resolved.toFile().length())
+        boolean partial = start > 0L && start < fileLength;
+        ResponseEntity.BodyBuilder response = partial
+                ? ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                : ResponseEntity.ok();
+
+        ResponseEntity.BodyBuilder bodyBuilder = response
+                .contentLength(fileLength - start)
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                 .header("X-Fafnir-Content-Encryption", "AES/CTR/NoPadding")
                 .header("X-Fafnir-Content-IV", Base64.getEncoder().encodeToString(record.iv()))
                 .header("X-Fafnir-Content-Original-MimeType", originalMimeType)
-                .body(body);
+                ;
+        if (partial) {
+            bodyBuilder.header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + (fileLength - 1L) + "/" + fileLength);
+        }
+        return bodyBuilder.body(body);
+    }
+
+    private static byte[] advanceCtrIv(byte[] iv, long blocks) {
+        if (blocks <= 0L) {
+            return iv;
+        }
+        byte[] current = iv.clone();
+        BigInteger value = new BigInteger(1, current);
+        value = value.add(BigInteger.valueOf(blocks));
+        byte[] raw = value.toByteArray();
+        byte[] result = new byte[current.length];
+        int copyStart = Math.max(0, raw.length - result.length);
+        int copyLength = Math.min(raw.length, result.length);
+        System.arraycopy(raw, copyStart, result, result.length - copyLength, copyLength);
+        return result;
     }
 
     private ArchiveListResponse buildListResponse(String path) {
