@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 public class ContactController {
@@ -98,7 +99,12 @@ public class ContactController {
         Process process = new ProcessBuilder("clamscan", "--no-summary", file.toAbsolutePath().toString())
                 .redirectErrorStream(true)
                 .start();
-        int exit = process.waitFor();
+        boolean finished = process.waitFor(30, TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            return new ScanResult(ScanStatus.ERROR);
+        }
+        int exit = process.exitValue();
         if (exit == 0) {
             return new ScanResult(ScanStatus.CLEAN);
         }

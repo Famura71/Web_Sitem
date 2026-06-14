@@ -21,9 +21,12 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
+import java.util.stream.Stream;
 
 @RestController
 public class FafnirController {
@@ -100,6 +103,62 @@ public class FafnirController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         return ResponseEntity.ok(buildListResponse(path));
+    }
+
+    @PostMapping(value = "/api/fafnir/archive/search", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ArchiveListResponse> search(@RequestBody SecureEnvelopeRequest request) {
+        if (request == null || isBlank(request.payload()) || isBlank(request.signature())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+
+        final org.json.JSONObject payload;
+        try {
+            payload = secureService.decryptEnvelope(request.payload(), request.signature());
+        } catch (IllegalArgumentException ex) {
+            log.warn("Fafnir archive search secure payload rejected: {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+
+        final String token;
+        final String path;
+        final String query;
+        try {
+            token = secureService.readToken(payload);
+            path = secureService.readPath(payload);
+            query = payload.optString("query", "").toLowerCase(Locale.ROOT);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        if (!authService.isTokenValid(token)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        if (query.isBlank()) {
+            return ResponseEntity.ok(buildListResponse(path));
+        }
+
+        String normalizedRoot = normalize(path);
+        Path root;
+        try {
+            root = archiveService.resolveRelativePath(normalizedRoot);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try (Stream<Path> walk = Files.walk(root)) {
+            List<ArchiveItemResponse> results = walk
+                    .filter(p -> !p.equals(root))
+                    .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).contains(query))
+                    .map(p -> createSearchItemResponse(root, normalizedRoot, p))
+                    .limit(100) // Performans için limit
+                    .toList();
+
+            return ResponseEntity.ok(new ArchiveListResponse(normalizedRoot, results));
+        } catch (Exception e) {
+            log.error("Search failed for path: {}", path, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @PostMapping(value = "/api/fafnir/archive/ticket", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -220,6 +279,37 @@ public class FafnirController {
             bodyBuilder.header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + (fileLength - 1L) + "/" + fileLength);
         }
         return bodyBuilder.body(body);
+    }
+
+    private ArchiveItemResponse createSearchItemResponse(Path root, String normalizedRoot, Path p) {
+        String rel = root.relativize(p).toString().replace('\\', '/');
+        String fullRel = normalizedRoot.isEmpty() ? rel : normalizedRoot + "/" + rel;
+        boolean isDir = Files.isDirectory(p);
+        String name = p.getFileName().toString();
+        String parent = fullRel.contains("/") ? fullRel.substring(0, fullRel.lastIndexOf('/')) : "";
+        String mime = null;
+        try {
+            mime = isDir ? null : Files.probeContentType(p);
+        } catch (Exception ignored) {}
+
+        String kind = "file";
+        if (isDir) {
+            kind = "folder";
+        } else if (mime != null) {
+            if (mime.startsWith("audio/")) kind = "audio";
+            else if (mime.startsWith("video/")) kind = "video";
+        }
+
+        return new ArchiveItemResponse(
+                fullRel,
+                parent,
+                name,
+                isDir,
+                mime,
+                isDir ? 0L : p.toFile().length(),
+                p.toFile().lastModified(),
+                kind
+        );
     }
 
     private static byte[] advanceCtrIv(byte[] iv, long blocks) {

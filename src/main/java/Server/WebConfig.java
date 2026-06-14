@@ -13,9 +13,6 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/Photos/**")
                 .addResourceLocations("classpath:/Photos/");
         registry.addResourceHandler("/PDFs/**")
-                .addResourceLocations(
-                        "file:src/main/resources/PDFs/",
-                        "classpath:/PDFs/"
-                );
+                .addResourceLocations("classpath:/PDFs/", "file:./config/PDFs/");
     }
 }
