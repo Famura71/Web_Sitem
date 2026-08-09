@@ -1,5 +1,7 @@
 package Server.Kahvehane;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -8,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -15,9 +18,11 @@ import java.util.Optional;
 public class KahvehaneGameController {
 
     private final KahvehaneOyuncuRepository repository;
+    private final KahvehaneWebSocketHandler webSocketHandler;
 
-    public KahvehaneGameController(KahvehaneOyuncuRepository repository) {
+    public KahvehaneGameController(KahvehaneOyuncuRepository repository, KahvehaneWebSocketHandler webSocketHandler) {
         this.repository = repository;
+        this.webSocketHandler = webSocketHandler;
     }
 
     // Helper method to hash passwords using SHA-256
@@ -153,6 +158,30 @@ public class KahvehaneGameController {
         repository.save(oyuncu);
 
         return ResponseEntity.ok(new OrderResponse(true, message, item, oyuncu.getBakiye()));
+    }
+
+    @GetMapping("/lobby/tables")
+    public ResponseEntity<String> getLobbyTables() {
+        JSONArray arr = new JSONArray();
+        Map<String, GameRoom> rooms = webSocketHandler.getRooms();
+        for (GameRoom room : rooms.values()) {
+            JSONObject obj = new JSONObject();
+            obj.put("roomId", room.getRoomId());
+            obj.put("gameType", room.getGameType());
+            obj.put("status", room.getStatus());
+
+            JSONArray players = new JSONArray();
+            for (RoomPlayer p : room.getPlayers()) {
+                JSONObject pObj = new JSONObject();
+                pObj.put("username", p.username());
+                pObj.put("isBot", p.isBot());
+                pObj.put("balance", p.balance());
+                players.put(pObj);
+            }
+            obj.put("players", players);
+            arr.put(obj);
+        }
+        return ResponseEntity.ok(arr.toString());
     }
 
     // DTO records

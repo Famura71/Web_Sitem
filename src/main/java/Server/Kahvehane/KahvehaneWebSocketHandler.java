@@ -29,6 +29,19 @@ public class KahvehaneWebSocketHandler extends TextWebSocketHandler {
 
     public KahvehaneWebSocketHandler(KahvehaneOyuncuRepository repository) {
         this.repository = repository;
+        // Prepopulate the 9 rooms (1 Blackjack, 2 Poker, 2 Pişti, 2 Batak, 2 Okey)
+        rooms.put("blackjack-1", new GameRoom("blackjack-1", "blackjack", repository));
+        
+        for (int i = 1; i <= 2; i++) {
+            rooms.put("poker-" + i, new GameRoom("poker-" + i, "poker", repository));
+            rooms.put("pisti-" + i, new GameRoom("pisti-" + i, "pisti", repository));
+            rooms.put("batak-" + i, new GameRoom("batak-" + i, "batak", repository));
+            rooms.put("okey-" + i, new GameRoom("okey-" + i, "okey", repository));
+        }
+    }
+
+    public Map<String, GameRoom> getRooms() {
+        return rooms;
     }
 
     @Override
@@ -69,10 +82,8 @@ public class KahvehaneWebSocketHandler extends TextWebSocketHandler {
                 if (room != null) {
                     room.removePlayer(session.getId());
                     broadcastRoomState(room);
-                    broadcastSystemChat(room, username + " masadan kalktı.");
-                    if (room.isEmpty()) {
-                        rooms.remove(roomId);
-                    }
+                    // Keep rooms permanently on floor plan even when empty
+                    // if (room.isEmpty()) { rooms.remove(roomId); }
                 }
             }
         }
@@ -93,9 +104,14 @@ public class KahvehaneWebSocketHandler extends TextWebSocketHandler {
         sessionRooms.put(session.getId(), roomId);
         userSessions.put(username, session);
 
-        GameRoom room = rooms.computeIfAbsent(roomId, id -> new GameRoom(id, gameType, repository));
-        if (!room.getGameType().equals(gameType)) {
-            sendError(session, "Oda farklı bir oyun tipine sahip: " + room.getGameType());
+        GameRoom room = rooms.get(roomId);
+        if (room == null) {
+            sendError(session, "Masa bulunamadı: " + roomId);
+            return;
+        }
+
+        if (room.getPlayers().size() >= 4) {
+            sendError(session, "Masa dolu! (Maksimum 4 oyuncu)");
             return;
         }
 
