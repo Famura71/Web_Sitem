@@ -201,6 +201,7 @@ public class KahvehaneGameController {
                 pObj.put("username", p.username());
                 pObj.put("isBot", p.isBot());
                 pObj.put("balance", p.balance());
+                pObj.put("seatIndex", p.getSeatIndex());
                 players.put(pObj);
             }
             obj.put("players", players);
