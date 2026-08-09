@@ -112,8 +112,9 @@ public class KahvehaneWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        if (room.getPlayers().size() >= 4) {
-            sendError(session, "Masa dolu! (Maksimum 4 oyuncu)");
+        int maxPlayers = (room.getGameType().equals("blackjack") || room.getGameType().equals("poker")) ? 5 : 4;
+        if (room.getPlayers().size() >= maxPlayers) {
+            sendError(session, "Masa dolu! (Maksimum " + maxPlayers + " oyuncu)");
             return;
         }
 
