@@ -29,15 +29,13 @@ public class KahvehaneWebSocketHandler extends TextWebSocketHandler {
 
     public KahvehaneWebSocketHandler(KahvehaneOyuncuRepository repository) {
         this.repository = repository;
-        // Prepopulate the 9 rooms (1 Blackjack, 2 Poker, 2 Pişti, 2 Batak, 2 Okey)
+        // Prepopulate the 6 rooms (1 Blackjack, 1 Poker, 1 Batak, 1 Pişti, 2 Okey)
         rooms.put("blackjack-1", new GameRoom("blackjack-1", "blackjack", repository));
-        
-        for (int i = 1; i <= 2; i++) {
-            rooms.put("poker-" + i, new GameRoom("poker-" + i, "poker", repository));
-            rooms.put("pisti-" + i, new GameRoom("pisti-" + i, "pisti", repository));
-            rooms.put("batak-" + i, new GameRoom("batak-" + i, "batak", repository));
-            rooms.put("okey-" + i, new GameRoom("okey-" + i, "okey", repository));
-        }
+        rooms.put("poker-1", new GameRoom("poker-1", "poker", repository));
+        rooms.put("batak-1", new GameRoom("batak-1", "batak", repository));
+        rooms.put("pisti-1", new GameRoom("pisti-1", "pisti", repository));
+        rooms.put("okey-1", new GameRoom("okey-1", "okey", repository));
+        rooms.put("okey-2", new GameRoom("okey-2", "okey", repository));
     }
 
     public Map<String, GameRoom> getRooms() {
