@@ -11,12 +11,21 @@ public class RoomPlayer {
     private List<String> hand = new ArrayList<>();
     private int score = 0;
     private String status = "WAITING"; // WAITING, PLAYING, FOLDED, STAND, BUST, etc.
+    private int seatIndex = -1;
 
     public RoomPlayer(String sessionId, String username, Long balance, Boolean isBot) {
         this.sessionId = sessionId;
         this.username = username;
         this.balance = balance;
         this.isBot = isBot;
+    }
+
+    public int getSeatIndex() {
+        return seatIndex;
+    }
+
+    public void setSeatIndex(int seatIndex) {
+        this.seatIndex = seatIndex;
     }
 
     public String sessionId() {

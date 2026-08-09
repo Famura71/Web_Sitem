@@ -130,7 +130,11 @@ public class KahvehaneWebSocketHandler extends TextWebSocketHandler {
         Optional<KahvehaneOyuncu> dbPlayerOpt = repository.findByKullaniciAdi(username);
         long balance = dbPlayerOpt.map(KahvehaneOyuncu::getBakiye).orElse(1000L);
 
-        room.addPlayer(new RoomPlayer(session.getId(), username, balance, false));
+        int seatIndex = json.optInt("seatIndex", -1);
+        RoomPlayer p = new RoomPlayer(session.getId(), username, balance, false);
+        p.setSeatIndex(seatIndex);
+        room.addPlayer(p);
+
         broadcastSystemChat(room, username + " masaya oturdu.");
         broadcastRoomState(room);
     }
@@ -283,6 +287,7 @@ public class KahvehaneWebSocketHandler extends TextWebSocketHandler {
             pObj.put("hand", new JSONArray(player.getHand()));
             pObj.put("score", player.getScore());
             pObj.put("status", player.getStatus());
+            pObj.put("seatIndex", player.getSeatIndex());
             playersArray.put(pObj);
         }
         response.put("players", playersArray);

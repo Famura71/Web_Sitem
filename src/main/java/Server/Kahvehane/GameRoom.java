@@ -53,7 +53,24 @@ public class GameRoom {
     public String getStatus() { return status; }
     public List<RoomPlayer> getPlayers() { return players; }
 
+    public int getFirstAvailableSeatIndex() {
+        int max = (gameType.equals("blackjack") || gameType.equals("poker")) ? 7 : 4;
+        Set<Integer> taken = new HashSet<>();
+        for (RoomPlayer p : players) {
+            taken.add(p.getSeatIndex());
+        }
+        for (int i = 0; i < max; i++) {
+            if (!taken.contains(i)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     public synchronized void addPlayer(RoomPlayer player) {
+        if (player.getSeatIndex() == -1) {
+            player.setSeatIndex(getFirstAvailableSeatIndex());
+        }
         players.add(player);
     }
 
