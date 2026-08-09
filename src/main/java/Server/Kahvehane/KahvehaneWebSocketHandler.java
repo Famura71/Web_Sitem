@@ -44,6 +44,10 @@ public class KahvehaneWebSocketHandler extends TextWebSocketHandler {
         return rooms;
     }
 
+    public boolean isPlayerOnline(String username) {
+        return userSessions.containsKey(username);
+    }
+
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         // Connection opened, waiting for authentication/join action

@@ -114,10 +114,35 @@ public class KahvehaneGameController {
     }
 
     @GetMapping("/player/leaderboard")
-    public ResponseEntity<List<PlayerInfo>> getLeaderboard() {
-        List<KahvehaneOyuncu> players = repository.findTop10ByOrderByBakiyeDesc();
-        List<PlayerInfo> leaderboard = players.stream().map(PlayerInfo::new).toList();
-        return ResponseEntity.ok(leaderboard);
+    public ResponseEntity<String> getLeaderboard() {
+        List<KahvehaneOyuncu> all = repository.findAll();
+        all.sort((p1, p2) -> Long.compare(p2.getBakiye(), p1.getBakiye()));
+
+        JSONArray playersArr = new JSONArray();
+        JSONArray botsArr = new JSONArray();
+
+        for (KahvehaneOyuncu p : all) {
+            JSONObject obj = new JSONObject();
+            obj.put("username", p.getKullaniciAdi());
+            obj.put("balance", p.getBakiye());
+            obj.put("gamesPlayed", p.getGamesPlayed());
+            obj.put("gamesWon", p.getGamesWon());
+
+            if (p.getIsBot()) {
+                obj.put("isOnline", false);
+                botsArr.put(obj);
+            } else {
+                boolean online = webSocketHandler.isPlayerOnline(p.getKullaniciAdi());
+                obj.put("isOnline", online);
+                playersArr.put(obj);
+            }
+        }
+
+        JSONObject result = new JSONObject();
+        result.put("players", playersArr);
+        result.put("bots", botsArr);
+
+        return ResponseEntity.ok(result.toString());
     }
 
     @PostMapping("/player/order")
