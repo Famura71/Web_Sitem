@@ -78,6 +78,10 @@ public class GameRoom {
         players.removeIf(p -> p.sessionId().equals(sessionId));
     }
 
+    public synchronized void removePlayerByUsername(String username) {
+        players.removeIf(p -> p.username().equals(username));
+    }
+
     public boolean isEmpty() {
         return players.isEmpty();
     }

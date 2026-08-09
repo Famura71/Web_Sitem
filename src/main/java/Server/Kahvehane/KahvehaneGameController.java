@@ -210,6 +210,18 @@ public class KahvehaneGameController {
         return ResponseEntity.ok(arr.toString());
     }
 
+    @PostMapping("/room/remove-bot")
+    public ResponseEntity<ApiResponse> removeBot(@RequestParam String roomId, @RequestParam String botName) {
+        GameRoom room = webSocketHandler.getRooms().get(roomId);
+        if (room == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse(false, "Masa bulunamadı!"));
+        }
+        room.removePlayerByUsername(botName);
+        webSocketHandler.broadcastSystemChat(room, botName + " masadan kaldırıldı.");
+        webSocketHandler.broadcastRoomState(room);
+        return ResponseEntity.ok(new ApiResponse(true, "Bot başarıyla kaldırıldı."));
+    }
+
     // DTO records
     public record AuthRequest(String username, String password) {}
     public record ApiResponse(boolean success, String message) {}
